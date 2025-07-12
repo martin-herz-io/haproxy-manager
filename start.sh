@@ -43,6 +43,7 @@ PROXIES_FILE="$DATA_DIR/proxies.json"
 setup_file_structure() {
     mkdir -p "$DATA_DIR"
     mkdir -p "$SCRIPT_DIR/etc/haproxy"
+    mkdir -p "$SCRIPT_DIR/backup"
     
     # Überprüfen, ob das Setup durchgeführt werden muss
     if [[ ! -f "$CONFIG_FILE" ]] || [[ ! -f "$PROXIES_FILE" ]]; then

@@ -173,3 +173,99 @@ apply_config() {
         return 1
     fi
 }
+
+# Funktion zum Erstellen eines Backups der HAProxy-Konfiguration
+create_haproxy_backup() {
+    gum style --foreground 212 --align center --width 50 "Backup erstellen"
+    
+    # Backup-Ordner erstellen, falls nicht vorhanden
+    local backup_dir="$SCRIPT_DIR/backup"
+    mkdir -p "$backup_dir"
+    
+    # Aktuelles Datum und Uhrzeit für den Backup-Namen
+    local timestamp=$(date "+%Y%m%d-%H%M%S")
+    local backup_file="$backup_dir/haproxy.cfg.$timestamp"
+    
+    # Backup erstellen
+    if [[ -f "$HAPROXY_CFG" ]]; then
+        cp "$HAPROXY_CFG" "$backup_file"
+        gum style --foreground 46 "Backup erfolgreich erstellt:" 
+        gum style "$backup_file" 
+        gum style --foreground 240 "Zeitstempel: $(date "+%d.%m.%Y %H:%M:%S")"
+        return 0
+    else
+        gum style --foreground 196 "Fehler: Konfigurationsdatei nicht gefunden unter $HAPROXY_CFG"
+        return 1
+    fi
+}
+
+# Funktion zum Wiederherstellen eines HAProxy-Konfiguration Backups
+restore_haproxy_backup() {
+    local backup_dir="$SCRIPT_DIR/backup"
+    
+    # Prüfen, ob Backup-Ordner existiert und Backups enthält
+    if [[ ! -d "$backup_dir" ]] || [[ -z "$(ls -A "$backup_dir" 2>/dev/null)" ]]; then
+        gum style --foreground 196 "Keine Backups gefunden."
+        return 1
+    fi
+    
+    gum style --foreground 212 --align center --width 50 "Backup wiederherstellen"
+    
+    # Liste der verfügbaren Backups
+    local backups=()
+    local backup_options=()
+    
+    while IFS= read -r file; do
+        backups+=("$file")
+        backup_options+=("$(basename "$file") ($(date -r "$file" "+%d.%m.%Y %H:%M:%S"))")
+    done < <(find "$backup_dir" -name "haproxy.cfg.*" -type f | sort -r)
+    
+    if [[ ${#backups[@]} -eq 0 ]]; then
+        gum style --foreground 196 "Keine Backups gefunden."
+        return 1
+    fi
+    
+    # Auswahl eines Backups mit gum
+    local selected_option
+    selected_option=$(gum choose --header="Wähle ein Backup zum Wiederherstellen:" "${backup_options[@]}")
+    
+    if [[ -z "$selected_option" ]]; then
+        gum style --foreground 196 "Keine Auswahl getroffen."
+        return 1
+    fi
+    
+    # Extrahiere den Dateinamen aus der ausgewählten Option
+    local backup_filename=$(echo "$selected_option" | awk '{print $1}')
+    
+    # Vollständiger Pfad zum ausgewählten Backup
+    local full_backup_path
+    for b in "${backups[@]}"; do
+        if [[ "$(basename "$b")" == "$backup_filename" ]]; then
+            full_backup_path="$b"
+            break
+        fi
+    done
+    
+    # Backup wiederherstellen
+    if [[ -f "$full_backup_path" ]]; then
+        # Sicherheitsabfrage
+        if gum confirm "Möchtest du das Backup $(basename "$full_backup_path") wirklich wiederherstellen?"; then
+            cp "$full_backup_path" "$HAPROXY_CFG"
+            gum style --foreground 46 "Backup wurde erfolgreich wiederhergestellt."
+            
+            # Frage, ob HAProxy neu gestartet werden soll
+            if validate_haproxy_config; then
+                if gum confirm "Möchtest du HAProxy mit der wiederhergestellten Konfiguration neu starten?"; then
+                    restart_haproxy
+                fi
+            fi
+            return 0
+        else
+            gum style --foreground 196 "Wiederherstellung abgebrochen."
+            return 1
+        fi
+    else
+        gum style --foreground 196 "Fehler: Backup-Datei nicht gefunden."
+        return 1
+    fi
+}

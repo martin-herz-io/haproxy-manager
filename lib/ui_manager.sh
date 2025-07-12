@@ -29,6 +29,8 @@ show_main_menu() {
         "HAProxy Konfiguration neu generieren" \
         "HAProxy Konfiguration validieren" \
         "HAProxy Konfiguration anwenden" \
+        "Backup erstellen" \
+        "Backup wiederherstellen" \
         "Beenden")
 
     case "$action" in
@@ -61,6 +63,14 @@ show_main_menu() {
             ;;
         "HAProxy Konfiguration anwenden")
             apply_config
+            gum confirm "Zurück zum Hauptmenü?" && show_main_menu
+            ;;
+        "Backup erstellen")
+            create_haproxy_backup
+            gum confirm "Zurück zum Hauptmenü?" && show_main_menu
+            ;;
+        "Backup wiederherstellen")
+            restore_haproxy_backup
             gum confirm "Zurück zum Hauptmenü?" && show_main_menu
             ;;
         "Beenden")
