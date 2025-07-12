@@ -4,6 +4,10 @@
 # Aber behalte das Verzeichnis selbst
 !/data/.gitkeep
 
+# Stelle sicher, dass data-setup nicht ignoriert wird
+!/data-setup/
+!/data-setup/*
+
 # Ignoriere temporäre Dateien
 *.tmp
 *.bak

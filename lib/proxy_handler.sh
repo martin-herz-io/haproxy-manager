@@ -1,8 +1,12 @@
 #!/bin/bash
 # proxy_handler.sh - Funktionen zum Verwalten der Proxies
 
-PROXIES_FILE="/home/martin-andree/Schreibtisch/LocalDev/haproxy-manager/data/proxies.json"
-HAPROXY_CFG="/home/martin-andree/Schreibtisch/LocalDev/haproxy-manager/etc/haproxy/haproxy.cfg"
+# Die Pfade werden von start.sh weitergegeben
+# SCRIPT_DIR, DATA_DIR, CONFIG_FILE und PROXIES_FILE werden bereits definiert
+# Die get_config_value-Funktion wird von config_utils.sh bereitgestellt
+
+# HAPROXY_CFG aus der Konfiguration auslesen
+HAPROXY_CFG=$(get_config_value "haproxy_cfg_path" "$SCRIPT_DIR/etc/haproxy/haproxy.cfg")
 
 # Funktion zum Auslesen aller Proxies
 list_proxies() {

@@ -1,9 +1,15 @@
 #!/bin/bash
 # config_generator.sh - Generiert die HAProxy Konfigurationsdatei aus den Proxies
 
-PROXIES_FILE="/home/martin-andree/Schreibtisch/LocalDev/haproxy-manager/data/proxies.json"
-HAPROXY_CFG="/home/martin-andree/Schreibtisch/LocalDev/haproxy-manager/etc/haproxy/haproxy.cfg"
-FALLBACK_IP="192.168.100.99"
+# Die Pfade werden von start.sh weitergegeben
+# SCRIPT_DIR, DATA_DIR, CONFIG_FILE und PROXIES_FILE werden bereits definiert
+# Die get_config_value-Funktion wird von config_utils.sh bereitgestellt
+
+# Konfigurationswerte auslesen
+HAPROXY_CFG=$(get_config_value "haproxy_cfg_path" "$SCRIPT_DIR/etc/haproxy/haproxy.cfg")
+FALLBACK_IP=$(get_config_value "fallback_ip" "192.168.100.99")
+PRODUCTION_MODE=$(get_config_value "production_mode" "false")
+RESTART_SERVICE=$(get_config_value "restart_service" "true")
 
 # Funktion zum Generieren der HAProxy-Konfiguration
 generate_haproxy_config() {
@@ -127,18 +133,33 @@ validate_haproxy_config() {
 
 # Funktion zum Neustart des HAProxy-Dienstes
 restart_haproxy() {
+    # Prüfen, ob der Service überhaupt neu gestartet werden soll
+    if [[ "$RESTART_SERVICE" != "true" ]]; then
+        echo "Neustart des HAProxy-Services deaktiviert in der Konfiguration."
+        return 0
+    fi
+    
     echo "Starte HAProxy neu..."
-    if command -v systemctl > /dev/null 2>&1; then
-        if sudo systemctl restart haproxy; then
-            echo "HAProxy wurde erfolgreich neu gestartet."
-            return 0
+    
+    # Unterschiedliches Verhalten je nach Produktionsmodus
+    if [[ "$PRODUCTION_MODE" == "true" ]]; then
+        # Im Produktionsmodus via systemctl neu starten
+        if command -v systemctl > /dev/null 2>&1; then
+            if sudo systemctl restart haproxy; then
+                echo "HAProxy wurde erfolgreich neu gestartet."
+                return 0
+            else
+                echo "Fehler beim Neustart von HAProxy!"
+                return 1
+            fi
         else
-            echo "Fehler beim Neustart von HAProxy!"
+            echo "Systemctl ist nicht verfügbar. HAProxy konnte nicht neu gestartet werden."
             return 1
         fi
     else
-        echo "Systemctl ist nicht verfügbar. HAProxy konnte nicht neu gestartet werden."
-        return 1
+        # Im Entwicklungsmodus nur eine Meldung ausgeben
+        echo "Im Entwicklungsmodus: HAProxy würde neu gestartet werden."
+        return 0
     fi
 }
 

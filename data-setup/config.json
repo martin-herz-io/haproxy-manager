@@ -1,0 +1,6 @@
+{
+  "haproxy_cfg_path": "/etc/haproxy/haproxy.cfg",
+  "fallback_ip": "192.168.100.99",
+  "production_mode": false,
+  "restart_service": true
+}

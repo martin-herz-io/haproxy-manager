@@ -1,7 +1,16 @@
 #!/bin/bash
-# ui_manager.sh - Funktionen für das gum-basierte UI
+# ui_manager.sh - Funktionen für das gum-basierte UI und den Hauptmenü-Dialog
 
-# Funktion für den Hauptmenü-Dialog
+# Funktion für das Anzeigen eines bestimmten Proxies
+show_view_proxy_menu() {
+    proxy_name=$(gum input --placeholder "Name des Proxies" --header="Welchen Proxy möchtest du anzeigen?")
+    
+    if [[ -n "$proxy_name" ]]; then
+        view_proxy "$proxy_name" | gum pager
+    fi
+    
+    gum confirm "Zurück zum Hauptmenü?" && show_main_menu
+}
 show_main_menu() {
     gum style \
         --foreground 212 --border-foreground 212 --border double \
@@ -16,8 +25,10 @@ show_main_menu() {
         "Neuen Proxy erstellen" \
         "Proxy bearbeiten" \
         "Proxy löschen" \
-        "Konfiguration neu generieren" \
-        "Konfiguration validieren" \
+        "Konfiguration anzeigen/bearbeiten" \
+        "HAProxy Konfiguration neu generieren" \
+        "HAProxy Konfiguration validieren" \
+        "HAProxy Konfiguration anwenden" \
         "Beenden")
 
     case "$action" in
@@ -37,12 +48,19 @@ show_main_menu() {
         "Proxy löschen")
             show_delete_proxy_menu
             ;;
-        "Konfiguration neu generieren")
+        "Konfiguration anzeigen/bearbeiten")
+            show_config_menu
+            ;;
+        "HAProxy Konfiguration neu generieren")
             generate_haproxy_config
             gum confirm "Zurück zum Hauptmenü?" && show_main_menu
             ;;
-        "Konfiguration validieren")
+        "HAProxy Konfiguration validieren")
             validate_haproxy_config
+            gum confirm "Zurück zum Hauptmenü?" && show_main_menu
+            ;;
+        "HAProxy Konfiguration anwenden")
+            apply_config
             gum confirm "Zurück zum Hauptmenü?" && show_main_menu
             ;;
         "Beenden")
@@ -51,16 +69,7 @@ show_main_menu() {
     esac
 }
 
-# Funktion für das Anzeigen eines bestimmten Proxies
-show_view_proxy_menu() {
-    proxy_name=$(gum input --placeholder "Name des Proxies" --header="Welchen Proxy möchtest du anzeigen?")
-    
-    if [[ -n "$proxy_name" ]]; then
-        view_proxy "$proxy_name" | gum pager
-    fi
-    
-    gum confirm "Zurück zum Hauptmenü?" && show_main_menu
-}
+# Diese Funktion ist bereits oben implementiert und gum-basiert
 
 # Funktion für das Erstellen eines neuen Proxies
 show_create_proxy_menu() {
@@ -192,4 +201,90 @@ show_delete_proxy_menu() {
     gum confirm "HAProxy-Konfiguration neu generieren?" && generate_haproxy_config
     
     gum confirm "Zurück zum Hauptmenü?" && show_main_menu
+}
+
+# Funktion zur Anzeige und Bearbeitung der Konfiguration
+show_config_menu() {
+    gum style --foreground 212 --align center --width 50 "Konfiguration verwalten"
+    
+    # Aktuelle Konfiguration anzeigen
+    gum style --align left --margin "1 2" --width 70 \
+        "Aktuelle Konfiguration:\n"\
+        "────────────────────────────────────────────\n"\
+        "HAProxy Config Pfad: $(get_config_value "haproxy_cfg_path" "$SCRIPT_DIR/etc/haproxy/haproxy.cfg")\n"\
+        "Fallback IP: $(get_config_value "fallback_ip" "192.168.100.99")\n"\
+        "Produktionsmodus: $(get_config_value "production_mode" "false")\n"\
+        "HAProxy neustarten: $(get_config_value "restart_service" "true")\n"\
+        "────────────────────────────────────────────\n"
+    
+    action=$(gum choose --header="Was möchten Sie tun?" \
+        "HAProxy Konfigurationspfad ändern" \
+        "Fallback IP ändern" \
+        "Produktionsmodus umschalten" \
+        "HAProxy-Neustart umschalten" \
+        "Konfiguration als JSON anzeigen" \
+        "Zurück zum Hauptmenü")
+    
+    case "$action" in
+        "HAProxy Konfigurationspfad ändern")
+            current_value=$(get_config_value "haproxy_cfg_path" "$SCRIPT_DIR/etc/haproxy/haproxy.cfg")
+            
+            gum style "Aktueller HAProxy Konfigurationspfad: $current_value"
+            new_value=$(gum input --value="$current_value" --header="Neuer HAProxy Konfigurationspfad:")
+            
+            if [[ -n "$new_value" ]]; then
+                set_config_value "haproxy_cfg_path" "$new_value"
+                gum style --foreground 46 "HAProxy Konfigurationspfad wurde aktualisiert."
+            fi
+            ;;
+        "Fallback IP ändern")
+            current_value=$(get_config_value "fallback_ip" "192.168.100.99")
+            
+            gum style "Aktuelle Fallback IP: $current_value"
+            new_value=$(gum input --value="$current_value" --header="Neue Fallback IP:")
+            
+            if [[ -n "$new_value" ]]; then
+                set_config_value "fallback_ip" "$new_value"
+                gum style --foreground 46 "Fallback IP wurde aktualisiert."
+            fi
+            ;;
+        "Produktionsmodus umschalten")
+            current_value=$(get_config_value "production_mode" "false")
+            
+            if [[ "$current_value" == "true" ]]; then
+                new_value="false"
+                message="Produktionsmodus wurde auf 'false' (Entwicklung) gesetzt."
+            else
+                new_value="true"
+                message="Produktionsmodus wurde auf 'true' (Produktion) gesetzt."
+            fi
+            
+            set_config_value "production_mode" "$new_value"
+            gum style --foreground 46 "$message"
+            ;;
+        "HAProxy-Neustart umschalten")
+            current_value=$(get_config_value "restart_service" "true")
+            
+            if [[ "$current_value" == "true" ]]; then
+                new_value="false"
+                message="HAProxy-Neustart wurde deaktiviert."
+            else
+                new_value="true"
+                message="HAProxy-Neustart wurde aktiviert."
+            fi
+            
+            set_config_value "restart_service" "$new_value"
+            gum style --foreground 46 "$message"
+            ;;
+        "Konfiguration als JSON anzeigen")
+            cat "$CONFIG_FILE" | jq '.' | gum pager --soft-wrap
+            ;;
+        "Zurück zum Hauptmenü")
+            show_main_menu
+            return
+            ;;
+    esac
+    
+    gum confirm "Zurück zur Konfiguration?" && show_config_menu || show_main_menu
+}
 }
