@@ -1,0 +1,14 @@
+# Ignoriere alle Dateien im data-Verzeichnis
+/data/*
+
+# Aber behalte das Verzeichnis selbst
+!/data/.gitkeep
+
+# Ignoriere temporäre Dateien
+*.tmp
+*.bak
+*.swp
+
+# Ignore OS-spezifische Dateien
+.DS_Store
+Thumbs.db
