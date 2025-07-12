@@ -74,7 +74,7 @@ backend ${proxy}_https
 EOL
     done
 
-    # Backend für NPM Dashboard (HTTPS)
+    # Backend für NPM Dashboard (HTTPS) - TCP-Modus
     cat >> "$HAPROXY_CFG" << EOL
 backend npm_dashboard
     mode tcp
@@ -95,7 +95,7 @@ EOL
     # NPM Dashboard ACL für HTTP zuerst definieren (höchste Priorität)
     echo "    # NPM-Dashboard zuerst abfangen" >> "$HAPROXY_CFG"
     echo "    acl is_npm_dashboard hdr(host) -m beg -i npm." >> "$HAPROXY_CFG"
-    echo "    use_backend npm_dashboard if is_npm_dashboard" >> "$HAPROXY_CFG"
+    echo "    use_backend npm_dashboard_http if is_npm_dashboard" >> "$HAPROXY_CFG"
     echo "" >> "$HAPROXY_CFG"
 
     # ACL-Definitionen für HTTP (ohne Regex, mit direktem Match für Root-Domain und end-Match für Subdomains)
@@ -125,8 +125,13 @@ backend ${proxy}_http
 EOL
     done
 
-    # Fallback-Backend für HTTP
+    # Backend für NPM Dashboard (HTTP) - HTTP-Modus
     cat >> "$HAPROXY_CFG" << EOL
+backend npm_dashboard_http
+    mode http
+    server central_npm ${NPM_DASHBOARD_IP}:${NPM_DASHBOARD_PORT}
+
+# Fallback-Backend für HTTP
 backend fallback_http
     mode http
     server fallback ${FALLBACK_IP}:80
