@@ -47,7 +47,7 @@ EOL
             for domain in $(jq -r ".[\"$proxy\"].domains[]" "$PROXIES_FILE"); do
                 echo "    acl is_${proxy} req.ssl_sni -i ${domain}" >> "$HAPROXY_CFG"                  # Root-Domain
                 echo "    acl is_${proxy} req.ssl_sni -m end -i .${domain}" >> "$HAPROXY_CFG"          # Subdomains
-                echo "    acl is_${proxy}_npm req.ssl_sni -i npm.${domain}" >> "$HAPROXY_CFG"          # NPM-Subdomain
+                # NPM-Subdomain wird nur für HTTP konfiguriert, nicht für HTTPS
             done
             echo "" >> "$HAPROXY_CFG"
         fi
@@ -55,10 +55,7 @@ EOL
 
     # Backend-Zuweisungen für HTTPS mit NPM-Priorität
     for proxy in $(jq -r 'keys[]' "$PROXIES_FILE"); do
-        # Prüfen, ob ACLs für diesen Proxy definiert wurden
-        if grep -q "acl is_${proxy}_npm" "$HAPROXY_CFG"; then
-            echo "    use_backend ${proxy}_npm_https if is_${proxy}_npm" >> "$HAPROXY_CFG"         # NPM-Backend zuerst
-        fi
+        # NPM-Backends werden nur für HTTP konfiguriert, nicht für HTTPS
         echo "    use_backend ${proxy}_https if is_${proxy}" >> "$HAPROXY_CFG"                    # Standard-Backend
     done
     echo "    default_backend fallback_https" >> "$HAPROXY_CFG"
@@ -73,15 +70,7 @@ backend ${proxy}_https
     server ${proxy} ${ip}:443
 
 EOL
-        # Separate NPM-Backends nur erstellen, wenn ACLs dafür existieren
-        if grep -q "acl is_${proxy}_npm" "$HAPROXY_CFG"; then
-            cat >> "$HAPROXY_CFG" << EOL
-backend ${proxy}_npm_https
-    mode tcp
-    server ${proxy}_npm ${ip}:81
-
-EOL
-        fi
+        # NPM-Backends werden nur für HTTP konfiguriert, nicht für HTTPS
     done
 
     # Fallback-Backend für HTTPS
