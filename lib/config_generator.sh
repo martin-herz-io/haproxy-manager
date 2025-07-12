@@ -96,8 +96,6 @@ frontend http_in
     mode http
 EOL
 
-EOL
-
     # ACL-Definitionen für HTTP (ohne Regex, mit direktem Match für Root-Domain, end-Match für Subdomains und spezifischer NPM-Subdomain)
     for proxy in $(jq -r 'keys[]' "$PROXIES_FILE"); do
         # Prüfen, ob der Proxy Domains hat
@@ -143,7 +141,8 @@ EOL
         fi
     done
 
-# Fallback-Backend für HTTP
+    # Fallback-Backend für HTTP
+    cat >> "$HAPROXY_CFG" << EOL
 backend fallback_http
     mode http
     server fallback ${FALLBACK_IP}:80
