@@ -1,6 +1,12 @@
 # Ignoriere alle Dateien im data-Verzeichnis
 /data/*
 
+# Ignoriere alle Dateien im data-Verzeichnis
+/etc/* 
+
+# Ignoriere alle Dateien im data-Verzeichnis
+/backup/* 
+
 # Aber behalte das Verzeichnis selbst
 !/data/.gitkeep
 
