@@ -169,22 +169,18 @@ restart_haproxy() {
     
     # Unterschiedliches Verhalten je nach Produktionsmodus
     if [[ "$PRODUCTION_MODE" == "true" ]]; then
-        # Im Produktionsmodus via systemctl neu starten
-        if command -v systemctl > /dev/null 2>&1; then
-            if sudo systemctl restart haproxy; then
-                echo "HAProxy wurde erfolgreich neu gestartet."
-                return 0
-            else
-                echo "Fehler beim Neustart von HAProxy!"
-                return 1
-            fi
+        # Im Produktionsmodus den korrekten Reload-Befehl ausführen
+        if sudo haproxy -c -f "$HAPROXY_CFG" && sudo systemctl reload haproxy; then
+            echo "HAProxy wurde erfolgreich neu geladen."
+            return 0
         else
-            echo "Systemctl ist nicht verfügbar. HAProxy konnte nicht neu gestartet werden."
+            echo "Fehler beim Neuladen von HAProxy!"
             return 1
         fi
     else
         # Im Entwicklungsmodus nur eine Meldung ausgeben
-        echo "Im Entwicklungsmodus: HAProxy würde neu gestartet werden."
+        echo "Im Entwicklungsmodus: HAProxy würde mit folgendem Befehl neu geladen:"
+        echo "haproxy -c -f $HAPROXY_CFG && systemctl reload haproxy"
         return 0
     fi
 }
