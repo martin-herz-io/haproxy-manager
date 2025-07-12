@@ -10,8 +10,6 @@ HAPROXY_CFG=$(get_config_value "haproxy_cfg_path" "$SCRIPT_DIR/etc/haproxy/hapro
 FALLBACK_IP=$(get_config_value "fallback_ip" "192.168.100.99")
 PRODUCTION_MODE=$(get_config_value "production_mode" "false")
 RESTART_SERVICE=$(get_config_value "restart_service" "true")
-NPM_DASHBOARD_IP=$(get_config_value "npm_dashboard_ip" "192.168.100.10")
-NPM_DASHBOARD_PORT=$(get_config_value "npm_dashboard_port" "81")
 
 # Funktion zum Generieren der HAProxy-Konfiguration
 generate_haproxy_config() {
@@ -41,29 +39,25 @@ frontend https_in
 
 EOL
 
-    # NPM Dashboard ACL für HTTPS zuerst definieren (höchste Priorität)
-    echo "    # NPM-Dashboard zuerst abfangen" >> "$HAPROXY_CFG"
-    echo "    acl is_npm_dashboard req.ssl_sni -m beg -i npm." >> "$HAPROXY_CFG"
-    echo "    use_backend npm_dashboard if is_npm_dashboard" >> "$HAPROXY_CFG"
-    echo "" >> "$HAPROXY_CFG"
-    
-    # ACL-Definitionen für HTTPS (ohne Regex, mit direktem Match für Root-Domain und end-Match für Subdomains)
+    # ACL-Definitionen für HTTPS (ohne Regex, mit direktem Match für Root-Domain, end-Match für Subdomains und spezifischer NPM-Subdomain)
     for proxy in $(jq -r 'keys[]' "$PROXIES_FILE"); do
         for domain in $(jq -r ".[\"$proxy\"].domains[]" "$PROXIES_FILE"); do
             echo "    acl is_${proxy} req.ssl_sni -i ${domain}" >> "$HAPROXY_CFG"                  # Root-Domain
             echo "    acl is_${proxy} req.ssl_sni -m end -i .${domain}" >> "$HAPROXY_CFG"          # Subdomains
+            echo "    acl is_${proxy}_npm req.ssl_sni -i npm.${domain}" >> "$HAPROXY_CFG"          # NPM-Subdomain
         done
         echo "" >> "$HAPROXY_CFG"
     done
 
-    # Backend-Zuweisungen für HTTPS
+    # Backend-Zuweisungen für HTTPS mit NPM-Priorität
     for proxy in $(jq -r 'keys[]' "$PROXIES_FILE"); do
-        echo "    use_backend ${proxy}_https if is_${proxy}" >> "$HAPROXY_CFG"
+        echo "    use_backend ${proxy}_npm_https if is_${proxy}_npm" >> "$HAPROXY_CFG"            # NPM-Backend zuerst
+        echo "    use_backend ${proxy}_https if is_${proxy}" >> "$HAPROXY_CFG"                    # Standard-Backend
     done
     echo "    default_backend fallback_https" >> "$HAPROXY_CFG"
     echo "" >> "$HAPROXY_CFG"
 
-    # Backend-Definitionen für HTTPS
+    # Backend-Definitionen für HTTPS und NPM-HTTPS
     for proxy in $(jq -r 'keys[]' "$PROXIES_FILE"); do
         ip=$(jq -r ".[\"$proxy\"].ip" "$PROXIES_FILE")
         cat >> "$HAPROXY_CFG" << EOL
@@ -71,16 +65,14 @@ backend ${proxy}_https
     mode tcp
     server ${proxy} ${ip}:443
 
+backend ${proxy}_npm_https
+    mode tcp
+    server ${proxy}_npm ${ip}:81
+
 EOL
     done
 
-    # Backend für NPM Dashboard (HTTPS) - TCP-Modus
-    cat >> "$HAPROXY_CFG" << EOL
-backend npm_dashboard
-    mode tcp
-    server central_npm ${NPM_DASHBOARD_IP}:${NPM_DASHBOARD_PORT}
-
-# Fallback-Backend für HTTPS
+    # Fallback-Backend für HTTPS
 backend fallback_https
     mode tcp
     server fallback ${FALLBACK_IP}:443
@@ -92,29 +84,25 @@ frontend http_in
 
 EOL
 
-    # NPM Dashboard ACL für HTTP zuerst definieren (höchste Priorität)
-    echo "    # NPM-Dashboard zuerst abfangen" >> "$HAPROXY_CFG"
-    echo "    acl is_npm_dashboard hdr(host) -m beg -i npm." >> "$HAPROXY_CFG"
-    echo "    use_backend npm_dashboard_http if is_npm_dashboard" >> "$HAPROXY_CFG"
-    echo "" >> "$HAPROXY_CFG"
-
-    # ACL-Definitionen für HTTP (ohne Regex, mit direktem Match für Root-Domain und end-Match für Subdomains)
+    # ACL-Definitionen für HTTP (ohne Regex, mit direktem Match für Root-Domain, end-Match für Subdomains und spezifischer NPM-Subdomain)
     for proxy in $(jq -r 'keys[]' "$PROXIES_FILE"); do
         for domain in $(jq -r ".[\"$proxy\"].domains[]" "$PROXIES_FILE"); do
             echo "    acl is_${proxy} hdr(host) -i ${domain}" >> "$HAPROXY_CFG"                  # Root-Domain
             echo "    acl is_${proxy} hdr(host) -m end -i .${domain}" >> "$HAPROXY_CFG"          # Subdomains
+            echo "    acl is_${proxy}_npm hdr(host) -i npm.${domain}" >> "$HAPROXY_CFG"          # NPM-Subdomain
         done
         echo "" >> "$HAPROXY_CFG"
     done
 
-    # Backend-Zuweisungen für HTTP
+    # Backend-Zuweisungen für HTTP mit NPM-Priorität
     for proxy in $(jq -r 'keys[]' "$PROXIES_FILE"); do
-        echo "    use_backend ${proxy}_http if is_${proxy}" >> "$HAPROXY_CFG"
+        echo "    use_backend ${proxy}_npm_http if is_${proxy}_npm" >> "$HAPROXY_CFG"            # NPM-Backend zuerst
+        echo "    use_backend ${proxy}_http if is_${proxy}" >> "$HAPROXY_CFG"                    # Standard-Backend
     done
     echo "    default_backend fallback_http" >> "$HAPROXY_CFG"
     echo "" >> "$HAPROXY_CFG"
 
-    # Backend-Definitionen für HTTP
+    # Backend-Definitionen für HTTP und NPM-HTTP
     for proxy in $(jq -r 'keys[]' "$PROXIES_FILE"); do
         ip=$(jq -r ".[\"$proxy\"].ip" "$PROXIES_FILE")
         cat >> "$HAPROXY_CFG" << EOL
@@ -122,14 +110,12 @@ backend ${proxy}_http
     mode http
     server ${proxy} ${ip}:80
 
+backend ${proxy}_npm_http
+    mode http
+    server ${proxy}_npm ${ip}:81
+
 EOL
     done
-
-    # Backend für NPM Dashboard (HTTP) - HTTP-Modus
-    cat >> "$HAPROXY_CFG" << EOL
-backend npm_dashboard_http
-    mode http
-    server central_npm ${NPM_DASHBOARD_IP}:${NPM_DASHBOARD_PORT}
 
 # Fallback-Backend für HTTP
 backend fallback_http
