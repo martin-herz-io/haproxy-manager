@@ -223,6 +223,8 @@ show_config_menu() {
         "────────────────────────────────────────────\n"\
         "HAProxy Config Pfad: $(get_config_value "haproxy_cfg_path" "$SCRIPT_DIR/etc/haproxy/haproxy.cfg")\n"\
         "Fallback IP: $(get_config_value "fallback_ip" "192.168.100.99")\n"\
+        "NPM Dashboard IP: $(get_config_value "npm_dashboard_ip" "192.168.100.10")\n"\
+        "NPM Dashboard Port: $(get_config_value "npm_dashboard_port" "81")\n"\
         "Produktionsmodus: $(get_config_value "production_mode" "false")\n"\
         "HAProxy neustarten: $(get_config_value "restart_service" "true")\n"\
         "────────────────────────────────────────────\n"
@@ -230,6 +232,8 @@ show_config_menu() {
     action=$(gum choose --header="Was möchten Sie tun?" \
         "HAProxy Konfigurationspfad ändern" \
         "Fallback IP ändern" \
+        "NPM Dashboard IP ändern" \
+        "NPM Dashboard Port ändern" \
         "Produktionsmodus umschalten" \
         "HAProxy-Neustart umschalten" \
         "Konfiguration als JSON anzeigen" \
@@ -256,6 +260,28 @@ show_config_menu() {
             if [[ -n "$new_value" ]]; then
                 set_config_value "fallback_ip" "$new_value"
                 gum style --foreground 46 "Fallback IP wurde aktualisiert."
+            fi
+            ;;
+        "NPM Dashboard IP ändern")
+            current_value=$(get_config_value "npm_dashboard_ip" "192.168.100.10")
+            
+            gum style "Aktuelle NPM Dashboard IP: $current_value"
+            new_value=$(gum input --value="$current_value" --header="Neue NPM Dashboard IP:")
+            
+            if [[ -n "$new_value" ]]; then
+                set_config_value "npm_dashboard_ip" "$new_value"
+                gum style --foreground 46 "NPM Dashboard IP wurde aktualisiert."
+            fi
+            ;;
+        "NPM Dashboard Port ändern")
+            current_value=$(get_config_value "npm_dashboard_port" "81")
+            
+            gum style "Aktueller NPM Dashboard Port: $current_value"
+            new_value=$(gum input --value="$current_value" --header="Neuer NPM Dashboard Port:")
+            
+            if [[ -n "$new_value" ]]; then
+                set_config_value "npm_dashboard_port" "$new_value"
+                gum style --foreground 46 "NPM Dashboard Port wurde aktualisiert."
             fi
             ;;
         "Produktionsmodus umschalten")
@@ -296,5 +322,4 @@ show_config_menu() {
     esac
     
     gum confirm "Zurück zur Konfiguration?" && show_config_menu || show_main_menu
-}
 }

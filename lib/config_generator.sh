@@ -10,6 +10,8 @@ HAPROXY_CFG=$(get_config_value "haproxy_cfg_path" "$SCRIPT_DIR/etc/haproxy/hapro
 FALLBACK_IP=$(get_config_value "fallback_ip" "192.168.100.99")
 PRODUCTION_MODE=$(get_config_value "production_mode" "false")
 RESTART_SERVICE=$(get_config_value "restart_service" "true")
+NPM_DASHBOARD_IP=$(get_config_value "npm_dashboard_ip" "192.168.100.10")
+NPM_DASHBOARD_PORT=$(get_config_value "npm_dashboard_port" "81")
 
 # Funktion zum Generieren der HAProxy-Konfiguration
 generate_haproxy_config() {
@@ -39,10 +41,17 @@ frontend https_in
 
 EOL
 
-    # ACL-Definitionen für HTTPS
+    # NPM Dashboard ACL für HTTPS zuerst definieren (höchste Priorität)
+    echo "    # NPM-Dashboard zuerst abfangen" >> "$HAPROXY_CFG"
+    echo "    acl is_npm_dashboard req.ssl_sni -m beg -i npm." >> "$HAPROXY_CFG"
+    echo "    use_backend npm_dashboard if is_npm_dashboard" >> "$HAPROXY_CFG"
+    echo "" >> "$HAPROXY_CFG"
+    
+    # ACL-Definitionen für HTTPS (ohne Regex, mit direktem Match für Root-Domain und end-Match für Subdomains)
     for proxy in $(jq -r 'keys[]' "$PROXIES_FILE"); do
         for domain in $(jq -r ".[\"$proxy\"].domains[]" "$PROXIES_FILE"); do
-            echo "    acl is_${proxy} req.ssl_sni -m reg -i ^(.+\.)?${domain//./\\.}$" >> "$HAPROXY_CFG"
+            echo "    acl is_${proxy} req.ssl_sni -i ${domain}" >> "$HAPROXY_CFG"                  # Root-Domain
+            echo "    acl is_${proxy} req.ssl_sni -m end -i .${domain}" >> "$HAPROXY_CFG"          # Subdomains
         done
         echo "" >> "$HAPROXY_CFG"
     done
@@ -65,8 +74,13 @@ backend ${proxy}_https
 EOL
     done
 
-    # Fallback-Backend für HTTPS
+    # Backend für NPM Dashboard (HTTPS)
     cat >> "$HAPROXY_CFG" << EOL
+backend npm_dashboard
+    mode tcp
+    server central_npm ${NPM_DASHBOARD_IP}:${NPM_DASHBOARD_PORT}
+
+# Fallback-Backend für HTTPS
 backend fallback_https
     mode tcp
     server fallback ${FALLBACK_IP}:443
@@ -78,10 +92,17 @@ frontend http_in
 
 EOL
 
-    # ACL-Definitionen für HTTP
+    # NPM Dashboard ACL für HTTP zuerst definieren (höchste Priorität)
+    echo "    # NPM-Dashboard zuerst abfangen" >> "$HAPROXY_CFG"
+    echo "    acl is_npm_dashboard hdr(host) -m beg -i npm." >> "$HAPROXY_CFG"
+    echo "    use_backend npm_dashboard if is_npm_dashboard" >> "$HAPROXY_CFG"
+    echo "" >> "$HAPROXY_CFG"
+
+    # ACL-Definitionen für HTTP (ohne Regex, mit direktem Match für Root-Domain und end-Match für Subdomains)
     for proxy in $(jq -r 'keys[]' "$PROXIES_FILE"); do
         for domain in $(jq -r ".[\"$proxy\"].domains[]" "$PROXIES_FILE"); do
-            echo "    acl is_${proxy} hdr(host) -m reg -i ^(.+\.)?${domain//./\\.}$" >> "$HAPROXY_CFG"
+            echo "    acl is_${proxy} hdr(host) -i ${domain}" >> "$HAPROXY_CFG"                  # Root-Domain
+            echo "    acl is_${proxy} hdr(host) -m end -i .${domain}" >> "$HAPROXY_CFG"          # Subdomains
         done
         echo "" >> "$HAPROXY_CFG"
     done
