@@ -93,18 +93,14 @@ EOL
             for domain in $(jq -r ".[\"$proxy\"].domains[]" "$PROXIES_FILE"); do
                 echo "    acl is_${proxy} hdr(host) -i ${domain}" >> "$HAPROXY_CFG"                  # Root-Domain
                 echo "    acl is_${proxy} hdr(host) -m end -i .${domain}" >> "$HAPROXY_CFG"          # Subdomains
-                echo "    acl is_${proxy}_npm hdr(host) -i npm.${domain}" >> "$HAPROXY_CFG"          # NPM-Subdomain
+                # NPM-Subdomain-Logik entfernt
             done
             echo "" >> "$HAPROXY_CFG"
         fi
     done
 
-    # Backend-Zuweisungen für HTTP mit NPM-Priorität
+    # Backend-Zuweisungen für HTTP
     for proxy in $(jq -r 'keys[]' "$PROXIES_FILE"); do
-        # Prüfen, ob ACLs für diesen Proxy definiert wurden
-        if grep -q "acl is_${proxy}_npm" "$HAPROXY_CFG"; then
-            echo "    use_backend ${proxy}_npm_http if is_${proxy}_npm" >> "$HAPROXY_CFG"         # NPM-Backend zuerst
-        fi
         echo "    use_backend ${proxy}_http if is_${proxy}" >> "$HAPROXY_CFG"                    # Standard-Backend
     done
     echo "    default_backend fallback_http" >> "$HAPROXY_CFG"
@@ -119,15 +115,7 @@ backend ${proxy}_http
     server ${proxy} ${ip}:80
 
 EOL
-        # Separate NPM-Backends nur erstellen, wenn ACLs dafür existieren
-        if grep -q "acl is_${proxy}_npm" "$HAPROXY_CFG"; then
-            cat >> "$HAPROXY_CFG" << EOL
-backend ${proxy}_npm_http
-    mode http
-    server ${proxy}_npm ${ip}:81
-
-EOL
-        fi
+        # NPM-Backend-Logik entfernt
     done
 
     # Fallback-Backend für HTTP
