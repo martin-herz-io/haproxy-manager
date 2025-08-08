@@ -26,9 +26,9 @@ global
 defaults
     log     global
     option  tcplog
-    timeout connect 90s
-    timeout client  90s
-    timeout server  90s
+    timeout connect 30s
+    timeout client  0s
+    timeout server  0s
 
 # ──────────────── HTTPS (Port 443 – TCP, SNI) ────────────────
 frontend https_in
