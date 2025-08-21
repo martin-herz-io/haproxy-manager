@@ -118,15 +118,16 @@ EOL
         ip=$(jq -r ".[\"$proxy\"].ip" "$PROXIES_FILE")
         send_proxy=$(jq -r ".[\"$proxy\"].send_proxy // \"false\"" "$PROXIES_FILE")
 
-        forwardfor_option=""
-        if [[ "$send_proxy" == "true" ]]; then
-            forwardfor_option="    option forwardfor\n"
-        fi
-
         cat >> "$HAPROXY_CFG" << EOL
 backend ${proxy}_http
     mode http
-${forwardfor_option}    server ${proxy} ${ip}:80
+EOL
+        if [[ "$send_proxy" == "true" ]]; then
+            echo "    option forwardfor" >> "$HAPROXY_CFG"
+        fi
+
+        cat >> "$HAPROXY_CFG" << EOL
+    server ${proxy} ${ip}:80
 
 EOL
         # NPM-Backend-Logik entfernt
