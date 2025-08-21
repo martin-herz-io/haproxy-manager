@@ -31,6 +31,7 @@ create_proxy() {
     local proxy_name="$1"
     local domains="$2"
     local ip="$3"
+    local send_proxy="${4:-false}" # Standardwert ist false
     
     # Prüfen, ob der Proxy bereits existiert
     if jq -e ".$proxy_name" "$PROXIES_FILE" > /dev/null 2>&1; then
@@ -42,8 +43,8 @@ create_proxy() {
     domain_array=$(echo "$domains" | jq -R 'split(",") | map(. | gsub("^\\s+|\\s+$"; ""))')
     
     # JSON aktualisieren
-    jq --arg name "$proxy_name" --argjson domains "$domain_array" --arg ip "$ip" \
-        '.[$name] = {"domains": $domains, "ip": $ip}' "$PROXIES_FILE" > "${PROXIES_FILE}.tmp"
+    jq --arg name "$proxy_name" --argjson domains "$domain_array" --arg ip "$ip" --argjson send_proxy "$send_proxy" \
+        '.[$name] = {"domains": $domains, "ip": $ip, "send_proxy": $send_proxy}' "$PROXIES_FILE" > "${PROXIES_FILE}.tmp"
     
     mv "${PROXIES_FILE}.tmp" "$PROXIES_FILE"
     echo "Proxy '$proxy_name' erfolgreich erstellt."
@@ -54,6 +55,7 @@ update_proxy() {
     local proxy_name="$1"
     local domains="$2"
     local ip="$3"
+    local send_proxy="${4:-false}" # Standardwert ist false
     
     # Prüfen, ob der Proxy existiert
     if ! jq -e ".$proxy_name" "$PROXIES_FILE" > /dev/null 2>&1; then
@@ -65,8 +67,8 @@ update_proxy() {
     domain_array=$(echo "$domains" | jq -R 'split(",") | map(. | gsub("^\\s+|\\s+$"; ""))')
     
     # JSON aktualisieren
-    jq --arg name "$proxy_name" --argjson domains "$domain_array" --arg ip "$ip" \
-        '.[$name] = {"domains": $domains, "ip": $ip}' "$PROXIES_FILE" > "${PROXIES_FILE}.tmp"
+    jq --arg name "$proxy_name" --argjson domains "$domain_array" --arg ip "$ip" --argjson send_proxy "$send_proxy" \
+        '.[$name] = {"domains": $domains, "ip": $ip, "send_proxy": $send_proxy}' "$PROXIES_FILE" > "${PROXIES_FILE}.tmp"
     
     mv "${PROXIES_FILE}.tmp" "$PROXIES_FILE"
     echo "Proxy '$proxy_name' erfolgreich aktualisiert."

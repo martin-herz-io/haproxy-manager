@@ -64,10 +64,17 @@ EOL
     # Backend-Definitionen für HTTPS
     for proxy in $(jq -r 'keys[]' "$PROXIES_FILE"); do
         ip=$(jq -r ".[\"$proxy\"].ip" "$PROXIES_FILE")
+        send_proxy=$(jq -r ".[\"$proxy\"].send_proxy // \"false\"" "$PROXIES_FILE")
+        
+        send_proxy_option=""
+        if [[ "$send_proxy" == "true" ]]; then
+            send_proxy_option=" send-proxy"
+        fi
+        
         cat >> "$HAPROXY_CFG" << EOL
 backend ${proxy}_https
     mode tcp
-    server ${proxy} ${ip}:443
+    server ${proxy} ${ip}:443${send_proxy_option}
 
 EOL
         # NPM-Backends werden nur für HTTP konfiguriert, nicht für HTTPS
@@ -109,10 +116,17 @@ EOL
     # Backend-Definitionen für HTTP
     for proxy in $(jq -r 'keys[]' "$PROXIES_FILE"); do
         ip=$(jq -r ".[\"$proxy\"].ip" "$PROXIES_FILE")
+        send_proxy=$(jq -r ".[\"$proxy\"].send_proxy // \"false\"" "$PROXIES_FILE")
+
+        send_proxy_option=""
+        if [[ "$send_proxy" == "true" ]]; then
+            send_proxy_option=" send-proxy"
+        fi
+
         cat >> "$HAPROXY_CFG" << EOL
 backend ${proxy}_http
     mode http
-    server ${proxy} ${ip}:80
+    server ${proxy} ${ip}:80${send_proxy_option}
 
 EOL
         # NPM-Backend-Logik entfernt

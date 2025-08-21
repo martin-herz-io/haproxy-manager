@@ -112,14 +112,21 @@ show_create_proxy_menu() {
         gum confirm "Abbrechen und zurück zum Hauptmenü?" && show_main_menu
         return
     fi
+
+    local send_proxy
+    if gum confirm "Soll das Proxy Protocol (send-proxy) für diesen Proxy aktiviert werden?"; then
+        send_proxy=true
+    else
+        send_proxy=false
+    fi
     
     # Bestätigung einholen
-    gum confirm "Proxy '${proxy_name}' mit Domains '${domains}' und IP '${ip}' erstellen?" || {
+    gum confirm "Proxy '${proxy_name}' mit Domains '${domains}', IP '${ip}' und send-proxy '${send_proxy}' erstellen?" || {
         gum confirm "Zurück zum Hauptmenü?" && show_main_menu
         return
     }
     
-    create_proxy "$proxy_name" "$domains" "$ip"
+    create_proxy "$proxy_name" "$domains" "$ip" "$send_proxy"
     
     # Fragen, ob HAProxy-Konfiguration neu generiert werden soll
     gum confirm "HAProxy-Konfiguration neu generieren?" && generate_haproxy_config
@@ -148,8 +155,9 @@ show_edit_proxy_menu() {
     # Aktuelle Werte holen
     current_domains=$(jq -r ".[\"$proxy_name\"].domains | join(\",\")" "$PROXIES_FILE")
     current_ip=$(jq -r ".[\"$proxy_name\"].ip" "$PROXIES_FILE")
+    current_send_proxy=$(jq -r ".[\"$proxy_name\"].send_proxy // \"false\"" "$PROXIES_FILE")
     
-    gum style "Aktuelle Werte:" "\nDomains: $current_domains" "\nIP: $current_ip"
+    gum style "Aktuelle Werte:" "\nDomains: $current_domains" "\nIP: $current_ip" "\nSend Proxy: $current_send_proxy"
     
     # Neue Werte erfassen
     domains=$(gum input --value="$current_domains" --header="Neue Domains (durch Komma getrennt):")
@@ -164,13 +172,20 @@ show_edit_proxy_menu() {
         ip="$current_ip"
     fi
     
+    local send_proxy
+    if gum confirm "Proxy Protocol (send-proxy) aktivieren?" --affirmative "Ja" --negative "Nein" --default="$([[ $current_send_proxy == true ]] && echo true || echo false)"; then
+        send_proxy=true
+    else
+        send_proxy=false
+    fi
+
     # Bestätigung einholen
-    gum confirm "Proxy '${proxy_name}' mit Domains '${domains}' und IP '${ip}' aktualisieren?" || {
+    gum confirm "Proxy '${proxy_name}' mit Domains '${domains}', IP '${ip}' und send-proxy '${send_proxy}' aktualisieren?" || {
         gum confirm "Zurück zum Hauptmenü?" && show_main_menu
         return
     }
     
-    update_proxy "$proxy_name" "$domains" "$ip"
+    update_proxy "$proxy_name" "$domains" "$ip" "$send_proxy"
     
     # Fragen, ob HAProxy-Konfiguration neu generiert werden soll
     gum confirm "HAProxy-Konfiguration neu generieren?" && generate_haproxy_config
